@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>Compare faces</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+    <script type="text/javascript">
+      function getBase64(type) {
+        var file   = $('#file-' + type)[0].files[0];
+        var reader = new FileReader();
+
+        reader.readAsDataURL(file);
+        reader.onload = function() {
+          var canvas = $('#image-' + type)[0];
+          var ctx    = canvas.getContext("2d");
+
+          var data  = reader.result;
+          var image = new Image();
+
+          image.src = data;
+
+          image.onload = function() {
+            var imgHeight    = image.naturalHeight;
+            var imgWidth     = image.naturalWidth;
+            var screenWidth  = canvas.width;
+            var screenHeight = canvas.height;
+            var scale        = 1;
+            /*if (imgWidth > screenWidth)
+                scaleX = screenWidth/imgWidth;
+            var imgHeight = image.naturalHeight;
+            var screenHeight = canvas.height;
+            var scaleY = 1;
+            if (imgHeight > screenHeight)
+                scaleY = screenHeight/imgHeight;
+            var scale = scaleY;
+            if(scaleX < scaleY)
+                scale = scaleX;
+            if(scale < 1){
+                imgHeight = imgHeight*scale;
+                imgWidth = imgWidth*scale;
+            }*/
+            if ( imgWidth > screenWidth || imgHeight > screenHeight ) {
+              scale     = screenWidth/imgWidth;
+              imgWidth  = imgWidth * scale;
+              imgHeight = ( imgWidth * image.naturalHeight ) / image.naturalWidth;
+              console.log("nWidth: ", image.naturalWidth);
+              console.log("nHeight: ", image.naturalHeight);
+              console.log("width: ", imgWidth);
+              console.log("height: ", imgWidth - 125);
+              ctx.drawImage( image, 0, 0, image.naturalWidth, image.naturalHeight, 0, 0, imgWidth, 200 );
+            } else {
+              ctx.drawImage( image, 0, 0, image.naturalWidth, image.naturalHeight )
+            }
+          };
+        };
+        reader.onerror = function(error) {
+          console.log('Error: ', error);
+        };
+      }
+
+      function drawSimilarBoxes(detected_faces) {
+        var target = $('#image-target')[0];
+        var ctx    = target.getContext("2d");
+
+        console.log("In drawSimilarBoxes: ", detected_faces);
+        for ( var index in detected_faces ) {
+          console.log("Face: ", detected_faces[index]);
+          let bounding_box = detected_faces[index]["Face"]["BoundingBox"];
+          console.log("bounding_box: ", bounding_box);
+          console.log("bounding_box_left: ", bounding_box["Left"]);
+          console.log("imgWidth: ", target.width);
+          var x      = bounding_box["Left"] * target.width;
+          var y      = bounding_box["Top"] * target.height;
+          var width  = bounding_box["Width"] * target.width;
+          var height = bounding_box["Height"] * target.height;
+
+          ctx.rect(x, y, width, height);
+          console.log("x: ", x, " y: ", y, " w: ", width, " h: ", height);
+          ctx.stroke();
+        }
+      }
+
+      function compareFaces() {
+        var source = $('#image-source')[0].toDataURL();
+        var target = $('#image-target')[0].toDataURL();
+
+        var body = JSON.stringify({
+          reference_image: source,
+          test_image: target
+        });
+
+        $.ajax({
+          url: "https://46qlnecc1h.execute-api.us-east-1.amazonaws.com/default/findFacesInPictures",
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          data: body,
+          success: function(response) {
+            var result = JSON.parse( response["data"] );
+            drawSimilarBoxes( result["FaceMatches"] );
+          },
+          error: function( error ) {
+            console.log("Error: ", error);
+          }
+        });
+      }
+    </script>
+
+    <style media="screen">
+      .image {
+        height: 450px;
+        background: gray;
+        margin: 20px;
+        vertical-align: middle;
+      }
+
+      canvas {
+        width: 100%;
+        height: 400px;
+        max-height: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="text-center">
+      <div class="container">
+        <div class="row">
+          <div id="image-source-wrapper" class="image col-sm-5">
+            <input id="file-source" type="file" onChange="getBase64('source')">
+            <canvas id="image-source">
+          </div>
+          <div id="image-target-wrapper" class="image col-sm-5">
+            <input type="file" id="file-target" onChange="getBase64('target')">
+            <canvas id="image-target">
+          </div>
+        </div>
+      </div>
+      <button id="ok" onClick="compareFaces()">OK</button>
+    </div>
+  </body>
+</html>
